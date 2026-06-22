@@ -74,6 +74,7 @@ h1{
 
         </div>
 
+        <input type="file" id="csvImport" accept=".csv" hidden>
         <div class="grid grid-cols-2 gap-3 mt-6">
 
             <button id="addBtn"
@@ -91,6 +92,11 @@ h1{
                 Clear All
             </button>
 
+            <button id="importBtn"
+    class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition rounded-2xl p-5 text-xl font-bold">
+    Import CSV
+</button>
+
             <button id="csvBtn"
                 class="bg-blue-600 hover:bg-blue-700 active:scale-95 transition rounded-2xl p-5 text-xl font-bold">
                 Download CSV
@@ -100,6 +106,10 @@ h1{
     </div>
 
     <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-4 overflow-x-auto">
+
+        <div class="mb-3 text-lg font-bold">
+    Total Entries: <span id="entryCount">0</span>
+</div>
 
         <table class="min-w-full">
 
@@ -127,6 +137,7 @@ h1{
 const STORAGE_KEY="warehouse_stocktake_rows";
 
 let rows=[];
+let editingIndex=-1;
 
 const locationInput=document.getElementById("location");
 const skuInput=document.getElementById("sku");
@@ -153,6 +164,7 @@ function renderTable(){
 
     const tbody=document.getElementById("tableBody");
     tbody.innerHTML="";
+    document.getElementById("entryCount").textContent=rows.length;
 
     rows.forEach((r,index)=>{
 
@@ -165,13 +177,21 @@ function renderTable(){
             <td class="p-3 text-lg">${escapeHtml(r.sku)}</td>
             <td class="p-3 text-lg">${escapeHtml(r.qty)}</td>
             <td class="p-3 text-lg">${escapeHtml(r.box)}</td>
-            <td class="p-3">
-                <button
-                    onclick="deleteRow(${index})"
-                    class="bg-red-600 hover:bg-red-700 rounded-xl px-4 py-2 font-bold">
-                    Delete
-                </button>
-            </td>
+            <td class="p-3 flex gap-2">
+
+    <button
+        onclick="editRow(${index})"
+        class="bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2 font-bold">
+        Edit
+    </button>
+
+    <button
+        onclick="deleteRow(${index})"
+        class="bg-red-600 hover:bg-red-700 rounded-xl px-4 py-2 font-bold">
+        Delete
+    </button>
+
+</td>
         `;
 
         tbody.appendChild(tr);
@@ -204,12 +224,29 @@ function addRow(){
         return;
     }
 
+if(editingIndex>-1){
+
+    rows[editingIndex]={
+        location,
+        sku,
+        qty,
+        box
+    };
+
+    editingIndex=-1;
+
+    document.getElementById("addBtn").textContent="Add Row";
+
+}else{
+
     rows.push({
         location,
         sku,
         qty,
         box
     });
+
+}
 
     renderTable();
 
@@ -221,6 +258,24 @@ function addRow(){
     locationInput.focus();
 
 }
+
+function editRow(index){
+
+    const row=rows[index];
+
+    locationInput.value=row.location;
+    skuInput.value=row.sku;
+    qtyInput.value=row.qty;
+    boxInput.value=row.box;
+
+    editingIndex=index;
+
+    document.getElementById("addBtn").textContent="Save Changes";
+
+    locationInput.focus();
+
+}
+
 
 function deleteRow(index){
 
@@ -248,6 +303,39 @@ function clearAll(){
         renderTable();
 
     }
+
+}
+
+function importCSV(file){
+
+    const reader=new FileReader();
+
+    reader.onload=function(event){
+
+        const text=event.target.result;
+
+        const lines=text.trim().split(/\r?\n/);
+
+        rows=[];
+
+        lines.slice(1).forEach(line=>{
+
+            const cols=line.split(",");
+
+            rows.push({
+                location: cols[0] || "",
+                sku: cols[1] || "",
+                qty: cols[2] || "",
+                box: cols[3] || ""
+            });
+
+        });
+
+        renderTable();
+
+    };
+
+    reader.readAsText(file);
 
 }
 
@@ -285,6 +373,26 @@ document.getElementById("addBtn").addEventListener("click",addRow);
 document.getElementById("undoBtn").addEventListener("click",undoLast);
 document.getElementById("clearBtn").addEventListener("click",clearAll);
 document.getElementById("csvBtn").addEventListener("click",downloadCSV);
+
+document.getElementById("importBtn").addEventListener("click",()=>{
+
+    document.getElementById("csvImport").click();
+
+});
+
+document.getElementById("csvImport").addEventListener("change",e=>{
+
+    const file=e.target.files[0];
+
+    if(!file) return;
+
+    if(confirm("Replace current stock take with imported CSV?")){
+
+        importCSV(file);
+
+    }
+
+});
 
 locationInput.addEventListener("keydown",e=>{
     if(e.key==="Enter") skuInput.focus();
